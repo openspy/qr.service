@@ -42,13 +42,13 @@ ClientMessageForwarder.prototype.OnGotServerEvent = function(message) {
             try {
                 var geo_data = this.geoip_reader.city(res[0]);
                 if(geo_data && geo_data.country && geo_data.country.isoCode) {
-                    this.redis_connection.hset(server_key + ":custkeys", "countrycode", geo_data.country.isoCode, function(err, res) {
+                    this.redis_connection.hset(server_key + "custkeys", "country", geo_data.country.isoCode, function(err, res) {
                         if(err) throw err;
                     });
                     
                 }
-            } catch {
-                
+            } catch (error) {
+
             }
             
         }.bind(this));

@@ -47,11 +47,11 @@ ServerProber.prototype.ProbeServerIPPort = function(ip_address, port) {
 }
 
 ServerProber.prototype.onProbeSocketGotData = function(msg, rinfo) {
-    var key = "IPMAP_" + rinfo.address + "-" + rinfo.port; //IPMAP_127.0.0.1-11111
+    var key = "IPMAP_" + rinfo.address + "-" + rinfo.port;
     this.redis_connection.get(key, function(err, server_key) {
         if(err) throw err;
         if(server_key) {
-            this.redis_connection.hset(key + "custkeys", "natneg", 0, function(err, res) {
+            this.redis_connection.hset(server_key + "custkeys", "natneg", 0, function(err, res) {
                 if(err) throw err;
             }.bind(this));
         }

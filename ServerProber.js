@@ -48,19 +48,13 @@ ServerProber.prototype.ProbeServerIPPort = function(ip_address, port) {
 
 ServerProber.prototype.onProbeSocketGotData = function(msg, rinfo) {
     var key = "IPMAP_" + rinfo.address + "-" + rinfo.port;
-    this.redis_connection.get(key, function(err, server_key) {
+    this.redis_connection.get(key, function(address, err, server_key) {
         if(err) throw err;
         if(server_key) {
-            this.redis_connection.hset(server_key + "custkeys", "natneg", 0, function(err, res) {
+            this.redis_connection.hmset(server_key, "allow_unsolicited_udp", 1, "icmp_address", address, function(err, res) {
                 if(err) throw err;
             }.bind(this));
         }
-    }.bind(this));
-}
-
-ServerProber.prototype.SetServerAllowUnsolicitedData = function(server_key) {
-    this.redis_connection.hset(server_key, "natneg", 0,function(err, res) {
-        if(err) throw err;
-    });
+    }.bind(this, rinfo.address));
 }
 module.exports = ServerProber;

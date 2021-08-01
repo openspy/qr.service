@@ -26,23 +26,19 @@ ServerProber.prototype.OnGotServerEvent = function(message) {
     var msg_split = sb_forwarded_message.split("\\");     
     if(msg_split[1] == "new") {
         var server_key = msg_split[2];
-        this.redis_connection.hmget(server_key, ["wan_ip", "wan_port"], function(err, res) {
+        this.redis_connection.hmget(server_key, ["wan_ip", "wan_port", "instance_key"], function(err, res) {
             if(err) {
                 throw err;
             }
             if(res == null && !res.length) return;
+            if(res[2] == null) return; //only scan v2 servers
             this.ProbeServerIPPort(res[0], parseInt(res[1]));
             
         }.bind(this));
     }
 }
 ServerProber.prototype.ProbeServerIPPort = function(ip_address, port) {
-    //do v1 query
-    var v1_buffer = Buffer.from("\\status\\");
     var v2_buffer = Buffer.from("fefd0000000000ff000000", "hex"); //v2 buffer - no prequery ip verify
-    //do v2 query
-
-    this.probe_socket.send(v1_buffer, port, ip_address);
     this.probe_socket.send(v2_buffer, port, ip_address);
 }
 

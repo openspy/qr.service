@@ -18,6 +18,7 @@ function ServerProber(redis_connection, amqpConnection) {
     }.bind(this));
 
     this.probe_socket = dgram.createSocket('udp4');
+    this.probe_socket.bind(process.env.MASTER_PROBE_PORT);
     this.probe_socket.on('message', this.onProbeSocketGotData.bind(this));
 }
 
@@ -31,7 +32,7 @@ ServerProber.prototype.OnGotServerEvent = function(message) {
                 throw err;
             }
             if(res == null && !res.length) return;
-            if(res[2] == null) return; //only scan v2 servers
+            if(res[2] == null || parseInt(res[2]) == 0) return; //only scan v2 servers
             this.ProbeServerIPPort(res[0], parseInt(res[1]));
             
         }.bind(this));

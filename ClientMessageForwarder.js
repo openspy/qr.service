@@ -9,7 +9,7 @@ function ClientMessageForwarder(redis_connection, amqpConnection) {
 
     this.client_message_resend_timers = {};
     this.CLIENT_MESSAGE_RESNED_INTERVAL = 1000;
-    this.CLIENT_MESSAGE_MAX_RESENDS = 15;
+    this.CLIENT_MESSAGE_MAX_RESENDS = 5;
 
     this.amqpConnection.createChannel(function(err, ch) {
         this.channel = ch;

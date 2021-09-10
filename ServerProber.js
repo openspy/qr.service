@@ -27,6 +27,7 @@ ServerProber.prototype.OnGotServerEvent = function(message) {
     var msg_split = sb_forwarded_message.split("\\");     
     if(msg_split[1] == "new") {
         var server_key = msg_split[2];
+        if(server_key.startsWith('flatout2pc')) return; //skip flatout2 probing
         this.redis_connection.hmget(server_key, ["wan_ip", "wan_port", "instance_key"], function(err, res) {
             if(err) {
                 throw err;

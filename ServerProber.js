@@ -57,6 +57,16 @@ ServerProber.prototype.CheckGameHasPrequeryIpVerify = function(gameid) {
     }.bind(this));
 
 }
+ServerProber.prototype.deleteProbeData = function(server_key) {
+    return new Promise(function(resolve, reject) {
+        this.redis_connection.select(this.SERVER_DATABASE, function(err) {
+            this.redis_connection.hdel(server_key, ["num_probes", "allow_unsolicited_udp", "icmp_address"], function(err, res) {
+                if(err) return reject(err);
+                return resolve();
+            }.bind(this));
+        }.bind(this));
+    }.bind(this));
+}
 ServerProber.prototype.OnGotServerEvent = function(message) {
     var sb_forwarded_message = message.content.toString();
     var msg_split = sb_forwarded_message.split("\\");     
@@ -65,40 +75,48 @@ ServerProber.prototype.OnGotServerEvent = function(message) {
         var server_key = msg_split[2];
         if(server_key.startsWith('flatout2pc')) return; //skip flatout2 probing
 
-        this.redis_connection.select(this.SERVER_DATABASE, function(err) {
-            if(err) {
-                throw err;
-            }
-            this.redis_connection.hmget(server_key, ["wan_ip", "wan_port", "instance_key", "num_probes", "allow_unsolicited_udp", "gameid"], function(err, res) {
+        var eventHandler = function() {
+            this.redis_connection.select(this.SERVER_DATABASE, function(err) {
                 if(err) {
                     throw err;
                 }
-                if(res == null && !res.length) return;
-                if(res[2] == null || parseInt(res[2]) == 0) return; //only scan v2 servers
-    
-                if(res[4] != null && !isNaN(parseInt(res[4]))) { //allow_unsolicited_udp is set, do not probe
-                    return;
-                }
-    
-                var num_probes = parseInt(res[3]) || 0;
-                if(num_probes >= this.MAX_PROBES) {
-                    this.redis_connection.hmset(server_key, "allow_unsolicited_udp", 0, function(err, res) {
-                        if(err) throw err;
-                    }.bind(this));
-                    return;
-                } else {
-                    this.redis_connection.hincrby(server_key, "num_probes", 1, async function(ip, port, gameid, err, res) {
-                        if(err) throw err;
-                        var is_prequery_ip_verify = await this.CheckGameHasPrequeryIpVerify(gameid);
-                        this.ProbeServerIPPort(ip, port, is_prequery_ip_verify);
-                    }.bind(this, res[0], parseInt(res[1]), parseInt(res[5])));
-                }
-                
-                
-            }.bind(this));
-        }.bind(this));
+                this.redis_connection.hmget(server_key, ["wan_ip", "wan_port", "instance_key", "num_probes", "allow_unsolicited_udp", "gameid"], function(err, res) {
+                    if(err) {
+                        throw err;
+                    }
+                    if(res == null && !res.length) return;
+                    if(res[2] == null || parseInt(res[2]) == 0) return; //only scan v2 servers
         
+                    if(res[4] != null && !isNaN(parseInt(res[4]))) { //allow_unsolicited_udp is set, do not probe
+                        return;
+                    }
+        
+                    var num_probes = parseInt(res[3]) || 0;
+                    if(num_probes >= this.MAX_PROBES) {
+                        this.redis_connection.hmset(server_key, "allow_unsolicited_udp", 0, function(err, res) {
+                            if(err) throw err;
+                        }.bind(this));
+                        return;
+                    } else {
+                        this.redis_connection.hincrby(server_key, "num_probes", 1, async function(ip, port, gameid, err, res) {
+                            if(err) throw err;
+                            var is_prequery_ip_verify = await this.CheckGameHasPrequeryIpVerify(gameid);
+                            this.ProbeServerIPPort(ip, port, is_prequery_ip_verify);
+                        }.bind(this, res[0], parseInt(res[1]), parseInt(res[5])));
+                    }
+                    
+                    
+                }.bind(this));
+            }.bind(this));
+        }.bind(this);
 
+        if(msg_split[1] == "new") {
+            this.deleteProbeData(server_key).then(eventHandler, function(err) {
+                throw err;
+            });
+        } else {
+            eventHandler();
+        }
     }
 }
 ServerProber.prototype.ProbeServerIPPort = function(ip_address, port, prequery_ip_verify) {

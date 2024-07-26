@@ -73,7 +73,7 @@ ServerProber.prototype.OnGotServerEvent = function(message) {
     
     if(msg_split[1] == "new" || msg_split[1] == "update") {
         var server_key = msg_split[2];
-        if(server_key.startsWith('flatout2pc')) return; //skip flatout2 probing
+        if(server_key.startsWith('flatout2pc') || server_key.startsWith('flatout2zp')) return; //skip flatout2 probing
 
         var eventHandler = function() {
             this.redis_connection.select(this.SERVER_DATABASE, function(err) {

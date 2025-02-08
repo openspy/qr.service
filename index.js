@@ -6,6 +6,17 @@ var amqp_url = process.env.RABBITMQ_URL || "amqp://guest:guest@localhost";
 
 var amqp = require('amqplib/callback_api');
 
+
+connection.on('error', function(err) {
+    console.error(err);
+    process.exit(-1);
+});
+
+connection.on('close', function(err) {
+    console.error(err);
+    process.exit(-1);
+});
+
 var ServerExpirationHandler = require('./ServerExpirationHandler');
 var ClientMessageForwarder = require('./ClientMessageForwarder');
 var CountryCodeAssigner = require('./CountryCodeAssigner');

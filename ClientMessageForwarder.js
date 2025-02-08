@@ -12,6 +12,14 @@ function ClientMessageForwarder(redis_connection, amqpConnection) {
     this.CLIENT_MESSAGE_MAX_RESENDS = 5;
 
     this.amqpConnection.createChannel(function(err, ch) {
+        if(err) {
+            console.error(err);
+            process.exit(-1);
+        }
+        ch.on('error', (err) => {
+            console.error(err);
+            process.exit(-1);
+        });
         this.channel = ch;
         ch.assertExchange(this.EVENT_EXCHANGE, 'topic', {durable: true});
         ch.assertQueue('', {exclusive: true}, function(err, q) {

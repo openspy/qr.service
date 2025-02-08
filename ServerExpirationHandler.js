@@ -8,6 +8,14 @@ function ServerExpirationHandler(redis_connection, amqpConnection) {
     this.EVENT_ROUTEKEY = "server.event";
 
     this.amqpConnection.createChannel(function(err, ch) {
+        if(err) {
+            console.error(err);
+            process.exit(-1);
+        }
+        ch.on('error', (err) => {
+            console.error(err);
+            process.exit(-1);
+        });
         this.channel = ch;
         this.StartEventTimer();    
     }.bind(this));

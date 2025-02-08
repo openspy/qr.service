@@ -14,10 +14,22 @@ function ServerProber(redis_connection, amqpConnection) {
     this.PREQUERY_IP_VERIFY_FLAG = 128;
 
     this.amqpConnection.createChannel(function(err, ch) {
+        if(err) {
+            console.error(err);
+            process.exit(-1);
+        }
+        ch.on('error', (err) => {
+            console.error(err);
+            process.exit(-1);
+        });
         this.channel = ch;
         ch.assertExchange(this.EVENT_EXCHANGE, 'topic', {durable: true});
 
         ch.assertQueue('', {exclusive: true}, function(err, q) {
+            if(err) {
+                console.error(err);
+                process.exit(-1);
+            }
             ch.bindQueue(q.queue, this.EVENT_EXCHANGE, this.EVENT_SERVER_EVENT_ROUTEKEY);
 
             ch.consume(q.queue, this.OnGotServerEvent.bind(this), {noAck: true});

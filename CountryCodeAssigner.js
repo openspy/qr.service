@@ -7,6 +7,15 @@ function ClientMessageForwarder(redis_connection, amqpConnection) {
     this.redis_connection = redis_connection;
 
     this.amqpConnection.createChannel(function(err, ch) {
+        if(err) {
+            console.error(err);
+            process.exit(-1);
+        }
+        ch.on('error', (err) => {
+            console.error(err);
+            process.exit(-1);
+        });
+
         this.channel = ch;
         ch.assertExchange(this.EVENT_EXCHANGE, 'topic', {durable: true});
 

@@ -7,6 +7,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const DEFAULT_CHANNEL_BUFFER_SIZE int = 1024
+
 type IServerEventHandler interface {
 	HandleNewServer(serverKey string)
 	HandleUpdateServer(serverKey string)

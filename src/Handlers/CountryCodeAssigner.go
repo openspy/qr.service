@@ -20,6 +20,7 @@ type CountryCodeAssigner struct {
 	redisClient  *redis.Client
 }
 
+// could this be slow due to disk io? should it be async too?
 func (h *CountryCodeAssigner) ResolveCountryCode(serverKey string) string {
 	var addr = h.serverMgr.GetAddress(h.context, h.redisClient, serverKey)
 

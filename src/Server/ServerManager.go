@@ -92,5 +92,13 @@ func (m *ServerManager) SetKeys(context context.Context, redisClient *redis.Clie
 
 func (m *ServerManager) GetServerKeyFromAddress(context context.Context, redisClient *redis.Client, addrPort netip.AddrPort) string {
 	m.selectRedisDB(context, redisClient)
-	return "some_key"
+	portStr := strconv.FormatUint(uint64(addrPort.Port()), 10)
+	//ipString := addrPort.Addr().String()
+	var key = "IPMAP_" + addrPort.Addr().String() + "-" + portStr
+	result, err := redisClient.Get(context, key).Result()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "GetServerKeyFromAddress error: %s\n", err.Error())
+		return ""
+	}
+	return result
 }

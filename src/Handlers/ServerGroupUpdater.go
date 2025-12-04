@@ -48,8 +48,8 @@ func (h *ServerGroupUpdater) SetManagers(redisOptions *redis.Options, context co
 	h.serverMgr = serverMgr
 	h.groupMgr = serverGroupMgr
 
-	h.newServerNotifyChan = make(chan string)
-	h.delServerNotifyChan = make(chan string)
+	h.newServerNotifyChan = make(chan string, DEFAULT_CHANNEL_BUFFER_SIZE)
+	h.delServerNotifyChan = make(chan string, DEFAULT_CHANNEL_BUFFER_SIZE)
 
 	h.resyncTicker = time.NewTicker(h.getResyncInterval())
 

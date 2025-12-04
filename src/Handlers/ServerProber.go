@@ -53,7 +53,7 @@ func (h *ServerProber) SetManagers(redisOptions *redis.Options, context context.
 	h.redisClient = redis.NewClient(h.redisOptions)
 	h.context = context
 	h.resyncTicker = time.NewTicker(5 * time.Second)
-	h.newServerNotifyChan = make(chan string)
+	h.newServerNotifyChan = make(chan string, DEFAULT_CHANNEL_BUFFER_SIZE)
 	h.probes = make(map[string]ProbeInfo)
 	h.Init()
 }
@@ -69,7 +69,7 @@ func (h *ServerProber) getBindAddr() *net.UDPAddr {
 }
 
 func (h *ServerProber) Init() {
-	ser, err := net.ListenUDP("udp", h.getBindAddr())
+	ser, err := net.ListenUDP("udp4", h.getBindAddr())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ServerProber bind failed: %s\n", err.Error())
 		return
@@ -139,7 +139,7 @@ func (h *ServerProber) onNewServer(serverKey string) {
 	}
 
 	var gameid = h.serverMgr.GetKeyInt(h.context, h.redisClient, serverKey, "gameid")
-	var gamename = h.gameMgr.GetGamename(h.context, h.redisClient, gameid)
+	var gamename = h.gameMgr.GetGameKey(h.context, h.redisClient, gameid)
 	var backendFlags = h.gameMgr.GetBackendFlags(h.context, h.redisClient, gamename)
 
 	var probeInfo ProbeInfo

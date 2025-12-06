@@ -71,7 +71,7 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisClien
 
 	gameGroupPipeline := redisClient.Pipeline()
 
-	//do pipelined scan of all servers, lookup (and cache) game
+	//do pipelined scan of all servers
 	m.selectServerRedisDB(context, redisClient)
 
 	var groupPipelineCmds []*redis.StringCmd
@@ -96,6 +96,7 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisClien
 		fmt.Fprintf(os.Stderr, "ResyncAllGroups pipeline error: %s\n", err.Error())
 	}
 
+	//now incr groupids for all servers which have them set
 	incrPipeline := redisClient.Pipeline()
 	for idx := 0; idx < len(groupPipelineCmds); idx += 2 {
 		gamename, _ := groupPipelineCmds[idx].Result()

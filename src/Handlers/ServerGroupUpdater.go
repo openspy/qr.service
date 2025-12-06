@@ -94,11 +94,10 @@ func (h *ServerGroupUpdater) incrServerGroupid(serverKey string) {
 	if groupid == 0 {
 		return
 	}
-	var gameid = h.serverMgr.GetKeyInt(h.context, h.redisClient, serverKey, "gameid")
 
-	h.serverMgr.SetKey(h.context, h.redisClient, serverKey, "groupid_set", string(groupid))
+	h.serverMgr.SetKey(h.context, h.redisClient, serverKey, "groupid_set", strconv.Itoa(groupid))
 
-	var groupkey = h.groupMgr.GetServerKey(h.context, h.redisClient, gameid, groupid)
+	var groupkey = h.groupMgr.GetGroupKey(h.context, h.redisClient, serverKey)
 	h.groupMgr.IncrNumServers(h.context, h.redisClient, groupkey)
 }
 
@@ -106,9 +105,8 @@ func (h *ServerGroupUpdater) decrServerGroupid(serverKey string) {
 	if h.serverMgr.GetKeyInt(h.context, h.redisClient, serverKey, "groupid_set") == 0 {
 		return
 	}
-	var groupid = h.serverMgr.GetKeyInt(h.context, h.redisClient, serverKey, "groupid")
-	var gameid = h.serverMgr.GetKeyInt(h.context, h.redisClient, serverKey, "gameid")
+	h.serverMgr.DeleteKey(h.context, h.redisClient, serverKey, "groupid_set")
 
-	var groupkey = h.groupMgr.GetServerKey(h.context, h.redisClient, gameid, groupid)
+	var groupkey = h.groupMgr.GetGroupKey(h.context, h.redisClient, serverKey)
 	h.groupMgr.DecrNumServers(h.context, h.redisClient, groupkey)
 }

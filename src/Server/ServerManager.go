@@ -102,3 +102,8 @@ func (m *ServerManager) GetServerKeyFromAddress(context context.Context, redisCl
 	}
 	return result
 }
+
+func (m *ServerManager) DeleteKey(context context.Context, redisClient *redis.Client, serverKey string, keyName string) {
+	m.selectRedisDB(context, redisClient)
+	redisClient.HDel(context, serverKey, keyName)
+}

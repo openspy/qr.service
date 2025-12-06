@@ -16,4 +16,6 @@ type IServerManager interface {
 	SetKey(context context.Context, redisClient *redis.Client, serverKey string, keyName string, keyValue string)
 	GetServerKeyFromAddress(context context.Context, redisClient *redis.Client, addrPort netip.AddrPort) string
 	SetKeys(context context.Context, redisClient *redis.Client, serverKey string, keys []string)
+
+	DeleteKey(context context.Context, redisClient *redis.Client, serverKey string, keyName string)
 }

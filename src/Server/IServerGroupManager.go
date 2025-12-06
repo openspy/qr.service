@@ -7,7 +7,7 @@ import (
 )
 
 type IServerGroupManager interface {
-	GetServerKey(context context.Context, redisClient *redis.Client, gameid int, groupid int) string
+	GetGroupKey(context context.Context, redisClient *redis.Client, serverKey string) string
 	IncrNumServers(context context.Context, redisClient *redis.Client, serverKey string)
 	DecrNumServers(context context.Context, redisClient *redis.Client, serverKey string)
 	ResyncAllGroups(context context.Context, redisClient *redis.Client)

@@ -15,15 +15,14 @@ type CountryCodeAssigner struct {
 	serverMgr Server.IServerManager
 	geoip     *geoip2.Reader
 
-	context      context.Context
-	redisOptions *redis.Options
-	redisClient  *redis.Client
+	context             context.Context
+	redisOptions        *redis.Options
+	redisClient         *redis.Client
+	newServerNotifyChan chan string
 }
 
-// could this be slow due to disk io? should it be async too?
 func (h *CountryCodeAssigner) ResolveCountryCode(serverKey string) string {
 	var addr = h.serverMgr.GetAddress(h.context, h.redisClient, serverKey)
-
 	record, err := h.geoip.Country(addr.Addr())
 	if err != nil {
 		log.Fatal(err)
@@ -34,13 +33,19 @@ func (h *CountryCodeAssigner) ResolveCountryCode(serverKey string) string {
 	}
 	return record.Country.ISOCode
 }
-func (h *CountryCodeAssigner) HandleNewServer(serverKey string) {
+func (h *CountryCodeAssigner) handleNewServerEvent(serverKey string) {
 	var countryCode = h.ResolveCountryCode(serverKey)
 	if len(countryCode) == 0 {
 		return
 	}
 	h.serverMgr.SetKey(h.context, h.redisClient, serverKey, "country", countryCode)
-	fmt.Printf("CountryCodeAssigner new server: %s - %s - %s\n", h.serverMgr.GetAddress(h.context, h.redisClient, serverKey).Addr().String(), h.serverMgr.GetCustomKey(h.context, h.redisClient, serverKey, "hostname"), h.serverMgr.GetKey(h.context, h.redisClient, serverKey, "challenge"))
+	fmt.Printf("CountryCodeAssigner new server: %s - %s - %s\n",
+		h.serverMgr.GetAddress(h.context, h.redisClient, serverKey).Addr().String(),
+		h.serverMgr.GetCustomKey(h.context, h.redisClient, serverKey, "hostname"),
+		h.serverMgr.GetKey(h.context, h.redisClient, serverKey, "challenge"))
+}
+func (h *CountryCodeAssigner) HandleNewServer(serverKey string) {
+	h.newServerNotifyChan <- serverKey
 }
 func (h *CountryCodeAssigner) HandleUpdateServer(serverKey string) {
 
@@ -48,10 +53,26 @@ func (h *CountryCodeAssigner) HandleUpdateServer(serverKey string) {
 func (h *CountryCodeAssigner) HandleDeleteServer(serverKey string) {
 
 }
+
+func (h *CountryCodeAssigner) syncLoop() {
+	var isRunning bool = true
+	for {
+		select {
+		case serverKey := <-h.newServerNotifyChan:
+			h.handleNewServerEvent(serverKey)
+		case <-h.context.Done():
+			isRunning = false
+		}
+		if !isRunning {
+			break
+		}
+	}
+}
 func (h *CountryCodeAssigner) SetManagers(redisOptions *redis.Options, context context.Context, serverMgr Server.IServerManager, serverGroupMgr Server.IServerGroupManager, gameMgr Server.IGameManager) {
 	h.redisOptions = redisOptions
 	h.redisClient = redis.NewClient(h.redisOptions)
 	h.context = context
+	h.newServerNotifyChan = make(chan string, DEFAULT_CHANNEL_BUFFER_SIZE)
 
 	h.serverMgr = serverMgr
 
@@ -63,4 +84,6 @@ func (h *CountryCodeAssigner) SetManagers(redisOptions *redis.Options, context c
 		return
 	}
 	h.geoip = db
+
+	go h.syncLoop()
 }

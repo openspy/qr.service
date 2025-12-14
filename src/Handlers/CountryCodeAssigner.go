@@ -23,6 +23,9 @@ type CountryCodeAssigner struct {
 
 func (h *CountryCodeAssigner) ResolveCountryCode(serverKey string) string {
 	var addr = h.serverMgr.GetAddress(h.context, h.redisClient, serverKey)
+	if addr == nil {
+		return ""
+	}
 	record, err := h.geoip.Country(addr.Addr())
 	if err != nil {
 		log.Fatal(err)
@@ -70,6 +73,7 @@ func (h *CountryCodeAssigner) syncLoop() {
 }
 func (h *CountryCodeAssigner) SetManagers(redisOptions *redis.Options, context context.Context, serverMgr Server.IServerManager, serverGroupMgr Server.IServerGroupManager, gameMgr Server.IGameManager) {
 	h.redisOptions = redisOptions
+	h.redisOptions.DB = 0
 	h.redisClient = redis.NewClient(h.redisOptions)
 	h.context = context
 	h.newServerNotifyChan = make(chan string, DEFAULT_CHANNEL_BUFFER_SIZE)

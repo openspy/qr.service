@@ -21,8 +21,9 @@ type ServerGroupUpdater struct {
 	newServerNotifyChan chan string
 	delServerNotifyChan chan string
 
-	redisOptions *redis.Options
-	redisClient  *redis.Client
+	redisOptions         *redis.Options
+	redisServerMgrClient *redis.Client
+	redisGroupMgrClient  *redis.Client
 }
 
 func (h *ServerGroupUpdater) HandleNewServer(serverKey string) {
@@ -54,9 +55,13 @@ func (h *ServerGroupUpdater) SetManagers(redisOptions *redis.Options, context co
 	h.resyncTicker = time.NewTicker(h.getResyncInterval())
 
 	h.redisOptions = redisOptions
-	h.redisClient = redis.NewClient(h.redisOptions)
+	h.redisOptions.DB = 0
+	h.redisServerMgrClient = redis.NewClient(h.redisOptions)
 
-	h.groupMgr.ResyncAllGroups(h.context, h.redisClient)
+	h.redisOptions.DB = 1
+	h.redisGroupMgrClient = redis.NewClient(h.redisOptions)
+
+	h.groupMgr.ResyncAllGroups(h.context, h.redisServerMgrClient, h.redisGroupMgrClient)
 
 	go h.syncLoop()
 }
@@ -76,7 +81,7 @@ func (h *ServerGroupUpdater) syncLoop() {
 		case serverKey := <-h.delServerNotifyChan:
 			h.decrServerGroupid(serverKey)
 		case <-h.resyncTicker.C:
-			h.groupMgr.ResyncAllGroups(h.context, h.redisClient)
+			h.groupMgr.ResyncAllGroups(h.context, h.redisServerMgrClient, h.redisGroupMgrClient)
 		case <-h.context.Done():
 			isRunning = false
 		}
@@ -86,27 +91,27 @@ func (h *ServerGroupUpdater) syncLoop() {
 	}
 }
 func (h *ServerGroupUpdater) incrServerGroupid(serverKey string) {
-	if h.serverMgr.GetKeyInt(h.context, h.redisClient, serverKey, "groupid_set") != 0 {
+	if h.serverMgr.GetKeyInt(h.context, h.redisServerMgrClient, serverKey, "groupid_set") != 0 {
 		return
 	}
 
-	var groupid = h.serverMgr.GetCustomKeyInt(h.context, h.redisClient, serverKey, "groupid")
+	var groupid = h.serverMgr.GetCustomKeyInt(h.context, h.redisServerMgrClient, serverKey, "groupid")
 	if groupid == 0 {
 		return
 	}
 
-	h.serverMgr.SetKey(h.context, h.redisClient, serverKey, "groupid_set", strconv.Itoa(groupid))
+	h.serverMgr.SetKey(h.context, h.redisServerMgrClient, serverKey, "groupid_set", strconv.Itoa(groupid))
 
-	var groupkey = h.groupMgr.GetGroupKey(h.context, h.redisClient, serverKey)
-	h.groupMgr.IncrNumServers(h.context, h.redisClient, groupkey)
+	var groupkey = h.serverMgr.GetGroupKey(h.context, h.redisGroupMgrClient, serverKey)
+	h.groupMgr.IncrNumServers(h.context, h.redisGroupMgrClient, groupkey)
 }
 
 func (h *ServerGroupUpdater) decrServerGroupid(serverKey string) {
-	if h.serverMgr.GetKeyInt(h.context, h.redisClient, serverKey, "groupid_set") == 0 {
+	if h.serverMgr.GetKeyInt(h.context, h.redisServerMgrClient, serverKey, "groupid_set") == 0 {
 		return
 	}
-	h.serverMgr.DeleteKey(h.context, h.redisClient, serverKey, "groupid_set")
+	h.serverMgr.DeleteKey(h.context, h.redisServerMgrClient, serverKey, "groupid_set")
 
-	var groupkey = h.groupMgr.GetGroupKey(h.context, h.redisClient, serverKey)
-	h.groupMgr.DecrNumServers(h.context, h.redisClient, groupkey)
+	var groupkey = h.serverMgr.GetGroupKey(h.context, h.redisGroupMgrClient, serverKey)
+	h.groupMgr.DecrNumServers(h.context, h.redisGroupMgrClient, groupkey)
 }

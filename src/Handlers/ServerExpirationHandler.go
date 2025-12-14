@@ -25,10 +25,6 @@ type ServerExpirationHandler struct {
 	resyncTicker *time.Ticker
 }
 
-func (m *ServerExpirationHandler) selectServerRedisDB(context context.Context, redisClient *redis.Client) {
-	redisClient.Conn().Select(context, 0)
-}
-
 func (h *ServerExpirationHandler) getResyncInterval() time.Duration {
 	var interval_str = os.Getenv("SERVER_EXPIRE_SCAN_SECS")
 	val, err := strconv.Atoi(interval_str)
@@ -61,6 +57,7 @@ func (h *ServerExpirationHandler) SetManagers(redisOptions *redis.Options, conte
 	h.context = context
 	h.serverMgr = serverMgr
 	h.redisOptions = redisOptions
+	h.redisOptions.DB = 0
 	h.redisClient = redis.NewClient(h.redisOptions)
 
 	h.resyncTicker = time.NewTicker(h.getResyncInterval())
@@ -111,8 +108,6 @@ func (h *ServerExpirationHandler) doExpirationScan() {
 	//do scan and pipelined TTL
 	//if TTL < min ttl, append to delete list
 	//then set deletes (pipelined) and send event
-
-	h.selectServerRedisDB(h.context, h.redisClient)
 
 	var cursor int = 0
 	for {

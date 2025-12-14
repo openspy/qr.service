@@ -52,6 +52,7 @@ type ClientMessageForwarder struct {
 
 func (h *ClientMessageForwarder) SetManagers(redisOptions *redis.Options, context context.Context, serverMgr Server.IServerManager, serverGroupMgr Server.IServerGroupManager, gameMgr Server.IGameManager) {
 	h.redisOptions = redisOptions
+	h.redisOptions.DB = 0
 	h.redisClient = redis.NewClient(h.redisOptions)
 	h.context = context
 	h.serverManager = serverMgr

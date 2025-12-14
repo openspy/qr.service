@@ -27,9 +27,10 @@ type ServerProber struct {
 	serverMgr  Server.IServerManager
 	gameMgr    Server.IGameManager
 
-	redisOptions *redis.Options
-	redisClient  *redis.Client
-	context      context.Context
+	redisOptions         *redis.Options
+	redisServerMgrClient *redis.Client
+	redisGameMgrClient   *redis.Client
+	context              context.Context
 
 	resyncTicker        *time.Ticker
 	newServerNotifyChan chan string
@@ -50,7 +51,11 @@ func (h *ServerProber) SetManagers(redisOptions *redis.Options, context context.
 	h.serverMgr = serverMgr
 	h.gameMgr = gameMgr
 	h.redisOptions = redisOptions
-	h.redisClient = redis.NewClient(h.redisOptions)
+	h.redisOptions.DB = 0
+	h.redisServerMgrClient = redis.NewClient(h.redisOptions)
+
+	h.redisOptions.DB = 2
+	h.redisGameMgrClient = redis.NewClient(h.redisOptions)
 	h.context = context
 	h.resyncTicker = time.NewTicker(5 * time.Second)
 	h.newServerNotifyChan = make(chan string, DEFAULT_CHANNEL_BUFFER_SIZE)
@@ -133,14 +138,14 @@ func (h *ServerProber) doResend() {
 }
 
 func (h *ServerProber) onNewServer(serverKey string) {
-	var address = h.serverMgr.GetAddress(h.context, h.redisClient, serverKey)
+	var address = h.serverMgr.GetAddress(h.context, h.redisServerMgrClient, serverKey)
 	if address == nil {
 		return
 	}
 
-	var gameid = h.serverMgr.GetKeyInt(h.context, h.redisClient, serverKey, "gameid")
-	var gamename = h.gameMgr.GetGameKey(h.context, h.redisClient, gameid)
-	var backendFlags = h.gameMgr.GetBackendFlags(h.context, h.redisClient, gamename)
+	var gameid = h.serverMgr.GetKeyInt(h.context, h.redisServerMgrClient, serverKey, "gameid")
+	var gamename = h.gameMgr.GetGameKey(h.context, h.redisGameMgrClient, gameid)
+	var backendFlags = h.gameMgr.GetBackendFlags(h.context, h.redisGameMgrClient, gamename)
 
 	var probeInfo ProbeInfo
 	probeInfo.Address = address
@@ -175,14 +180,14 @@ func (h *ServerProber) listen() {
 
 		var udpAddr *net.UDPAddr = addr.(*net.UDPAddr)
 		var addrPort netip.AddrPort = udpAddr.AddrPort()
-		var serverKey = h.serverMgr.GetServerKeyFromAddress(h.context, h.redisClient, addrPort)
+		var serverKey = h.serverMgr.GetServerKeyFromAddress(h.context, h.redisServerMgrClient, addrPort)
 		if len(serverKey) == 0 {
 			continue
 		}
 		delete(h.probes, serverKey)
 		log.Println("got the packet back", serverKey)
 
-		h.serverMgr.SetKeys(h.context, h.redisClient, serverKey, []string{
+		h.serverMgr.SetKeys(h.context, h.redisServerMgrClient, serverKey, []string{
 			"allow_unsolicited_udp", "1",
 			"icmp_address", udpAddr.String(),
 		})

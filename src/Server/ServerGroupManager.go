@@ -13,43 +13,20 @@ const GROUP_SCAN_BATCH_COUNT int64 = 500
 type ServerGroupManager struct {
 }
 
-func (m *ServerGroupManager) selectGroupRedisDB(context context.Context, redisClient *redis.Client) {
-	redisClient.Conn().Select(context, 1)
-}
-func (m *ServerGroupManager) selectServerRedisDB(context context.Context, redisClient *redis.Client) {
-	redisClient.Conn().Select(context, 0)
-}
-
-func (m *ServerGroupManager) GetGroupKey(context context.Context, redisClient *redis.Client, serverKey string) string {
-	m.selectServerRedisDB(context, redisClient)
-	pipeline := redisClient.Pipeline()
-	gamenameCmd := pipeline.HGet(context, serverKey, "gamename")
-	groupidCmd := pipeline.HGet(context, serverKey+"custkeys", "groupid")
-	_, err := pipeline.Exec(context)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "IncrNumServers pipeline error: %s\n", err.Error())
-	}
-	gamename, _ := gamenameCmd.Result()
-	groupid, _ := groupidCmd.Result()
-	return gamename + ":" + groupid
-}
 func (m *ServerGroupManager) IncrNumServers(context context.Context, redisClient *redis.Client, groupKey string) {
-	m.selectGroupRedisDB(context, redisClient)
 	redisClient.HIncrBy(context, groupKey, "numservers", 1)
 }
 func (m *ServerGroupManager) DecrNumServers(context context.Context, redisClient *redis.Client, groupKey string) {
-	m.selectGroupRedisDB(context, redisClient)
 	redisClient.HIncrBy(context, groupKey, "numservers", -1)
 }
-func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisClient *redis.Client) {
-	m.selectGroupRedisDB(context, redisClient)
+func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServerClient *redis.Client, redisGroupClient *redis.Client) {
 
 	var cursor int = 0
 
-	deletePipeline := redisClient.Pipeline()
+	deletePipeline := redisGroupClient.Pipeline()
 	//do pipelined scan and clear
 	for {
-		keys, nextCursor, err := redisClient.Scan(context, uint64(cursor), "*:*", GROUP_SCAN_BATCH_COUNT).Result()
+		keys, nextCursor, err := redisGroupClient.Scan(context, uint64(cursor), "*:*", GROUP_SCAN_BATCH_COUNT).Result()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ResyncAllGroups scan error: %s\n", err.Error())
 			break
@@ -70,10 +47,8 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisClien
 	}
 
 	//do pipelined scan of all servers
-	m.selectServerRedisDB(context, redisClient)
-
 	for {
-		keys, nextCursor, err := redisClient.Scan(context, uint64(cursor), "*:", GROUP_SCAN_BATCH_COUNT).Result()
+		keys, nextCursor, err := redisServerClient.Scan(context, uint64(cursor), "*:", GROUP_SCAN_BATCH_COUNT).Result()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ResyncAllGroups game scan error: %s\n", err.Error())
 			break
@@ -82,7 +57,7 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisClien
 		cursor = int(nextCursor)
 		var groupPipelineCmds []*redis.StringCmd
 		var serverKeys []string
-		gameGroupPipeline := redisClient.Pipeline()
+		gameGroupPipeline := redisServerClient.Pipeline()
 		for _, key := range keys {
 			groupPipelineCmds = append(groupPipelineCmds, gameGroupPipeline.HGet(context, key, "gamename"))
 			groupPipelineCmds = append(groupPipelineCmds, gameGroupPipeline.HGet(context, key+"custkeys", "groupid"))
@@ -94,7 +69,8 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisClien
 		}
 
 		//now incr groupids for all servers which have them set
-		incrPipeline := redisClient.Pipeline()
+		incrPipeline := redisGroupClient.Pipeline()
+		serverGroupSetPipeline := redisServerClient.Pipeline()
 		for idx := 0; idx < len(groupPipelineCmds); idx += 2 {
 			gamename, _ := groupPipelineCmds[idx].Result()
 			groupidStr, _ := groupPipelineCmds[idx+1].Result()
@@ -103,11 +79,16 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisClien
 			}
 			var groupKey = gamename + ":" + groupidStr
 			incrPipeline.HIncrBy(context, groupKey, "numservers", 1)
-			incrPipeline.HSet(context, serverKeys[idx/2], "groupid_set", groupidStr)
+			serverGroupSetPipeline.HSet(context, serverKeys[idx/2], "groupid_set", groupidStr)
 		}
 		_, err = incrPipeline.Exec(context)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ResyncAllGroups INCR pipeline error: %s\n", err.Error())
+		}
+
+		_, err = serverGroupSetPipeline.Exec(context)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ResyncAllGroups INCR server groupid error: %s\n", err.Error())
 		}
 
 		if cursor == 0 {

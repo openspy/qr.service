@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand/v2"
 	"net/netip"
 	"os"
 	"os-qr-service/Helpers"
@@ -18,7 +19,7 @@ import (
 )
 
 const (
-	QR_MESSAGE_ROUTE_KEY            string = "qr.message"
+	QR_MESSAGE_ROUTE_KEY            string = "client.message"
 	QR_CLIENT_MESSAGE_ACK_ROUTE_KEY        = "client-messages.acks"
 )
 
@@ -28,12 +29,14 @@ type QRMessage struct {
 	Hostname      string `json:"hostname"`
 	DriverAddress string `json:"driver_address"`
 	ToAddress     string `json:"to_address"`
+	FromAddress   string `json:"from_address"` //this is inverted in the ack..
 	Message       string `json:"message"`
 	Version       int    `json:"version"`
 	InstanceKey   int    `json:"instance_key"`
-	Identifier    int    `json:"identifier"`
+	Identifier    int32  `json:"identifier"`
 	Type          string `json:"type"`
 	Retries       int
+	LastResend    time.Time
 }
 
 type ClientMessageForwarder struct {
@@ -129,7 +132,7 @@ func (h *ClientMessageForwarder) OnGotClientMessageFromServerBrowsing(amqpMsg am
 	var message = splitMsg[7]
 
 	addrPort, err := netip.ParseAddrPort(toIp + ":" + toPort)
-	if err != nil || len(err.Error()) > 0 {
+	if err != nil && len(err.Error()) > 0 {
 		fmt.Fprintf(os.Stderr, "OnGotClientMessageFromServerBrowsing ip parse error: %s\n", err.Error())
 		return
 	}
@@ -144,7 +147,7 @@ func (h *ClientMessageForwarder) ForwardMessageToQR(addrPort netip.AddrPort, bas
 	var results = h.serverManager.GetKeys(h.context, h.redisClient, serverKey, "instance_key", "driver_hostname", "driver_address")
 
 	instanceKey, parseError := strconv.Atoi(results[0])
-	if parseError != nil || len(parseError.Error()) > 0 {
+	if parseError != nil && len(parseError.Error()) > 0 {
 		fmt.Fprintf(os.Stderr, "ForwardMessageToQR instance key parse error: %s\n", parseError.Error())
 		return
 	}
@@ -156,9 +159,10 @@ func (h *ClientMessageForwarder) ForwardMessageToQR(addrPort netip.AddrPort, bas
 	qrMsg.ToAddress = addrPort.String()
 	qrMsg.Hostname = results[1]
 	qrMsg.DriverAddress = results[2]
-	qrMsg.Identifier = 111 //need to generate random value, this is the lookup key for client msg ack
+	qrMsg.Identifier = int32(rand.Int())
 	qrMsg.Type = "client_message"
 	qrMsg.Retries = 0
+	qrMsg.LastResend = time.Now()
 
 	var qrMsgKey = h.getClientMessageUniqueKey(qrMsg)
 	h.forwardedMessages[qrMsgKey] = qrMsg
@@ -167,8 +171,8 @@ func (h *ClientMessageForwarder) ForwardMessageToQR(addrPort netip.AddrPort, bas
 }
 func (h *ClientMessageForwarder) publishQRMessage(msg QRMessage) {
 	jsonData, jsonErr := json.Marshal(msg)
-	if jsonErr != nil || len(jsonErr.Error()) > 0 {
-		fmt.Fprintf(os.Stderr, "ForwardMessageToQR json marshal error: %s\n", jsonErr.Error())
+	if jsonErr != nil && len(jsonErr.Error()) > 0 {
+		fmt.Fprintf(os.Stderr, "publishQRMessage json marshal error: %s\n", jsonErr.Error())
 		return
 	}
 
@@ -190,10 +194,12 @@ func (h *ClientMessageForwarder) OnClientMessageAck(amqpMsg amqp.Delivery) {
 	//clear retry logic
 	var qrMsg QRMessage
 	jsonErr := json.Unmarshal(amqpMsg.Body, &qrMsg)
-	if jsonErr != nil || len(jsonErr.Error()) > 0 {
+	if jsonErr != nil && len(jsonErr.Error()) > 0 {
 		fmt.Fprintf(os.Stderr, "OnClientMessageAck json marshal error: %s\n", jsonErr.Error())
 		return
 	}
+
+	qrMsg.ToAddress = qrMsg.FromAddress //handle inversion from qr server
 
 	var qrMsgKey = h.getClientMessageUniqueKey(qrMsg)
 	delete(h.forwardedMessages, qrMsgKey)
@@ -205,6 +211,10 @@ func (h *ClientMessageForwarder) submitResends() {
 			delete(h.forwardedMessages, msgKey)
 			continue
 		}
+		if time.Since(value.LastResend) < time.Duration(2*time.Second) {
+			continue
+		}
+		value.LastResend = time.Now()
 		value.Retries = value.Retries + 1
 		h.forwardedMessages[msgKey] = value
 		h.publishQRMessage(value)
@@ -213,5 +223,5 @@ func (h *ClientMessageForwarder) submitResends() {
 }
 
 func (h *ClientMessageForwarder) getClientMessageUniqueKey(msg QRMessage) string {
-	return msg.Hostname + ":" + msg.DriverAddress + ":" + msg.ToAddress + ":" + strconv.Itoa(msg.InstanceKey) + ":" + strconv.Itoa(msg.Identifier)
+	return msg.Hostname + ":" + msg.DriverAddress + ":" + msg.ToAddress + ":" + strconv.Itoa(msg.InstanceKey) + ":" + strconv.Itoa(int(msg.Identifier))
 }

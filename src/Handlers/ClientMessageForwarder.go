@@ -22,17 +22,7 @@ const (
 	QR_CLIENT_MESSAGE_ACK_ROUTE_KEY        = "client-messages.acks"
 )
 
-type ClientMessageForwarder struct {
-	context        context.Context
-	redisOptions   *redis.Options
-	redisClient    *redis.Client
-	amqpChannel    *amqp.Channel
-	amqpQueue      amqp.Queue
-	resendTicker   *time.Ticker
-	serverManager  Server.IServerManager
-	serverGroupMgr Server.IServerGroupManager
-	gameManager    Server.IGameManager
-}
+const NUM_CLIENT_MESSAGE_RETRIES int = 3
 
 type QRMessage struct {
 	Hostname      string `json:"hostname"`
@@ -43,6 +33,21 @@ type QRMessage struct {
 	InstanceKey   int    `json:"instance_key"`
 	Identifier    int    `json:"identifier"`
 	Type          string `json:"type"`
+	Retries       int
+}
+
+type ClientMessageForwarder struct {
+	context        context.Context
+	redisOptions   *redis.Options
+	redisClient    *redis.Client
+	amqpChannel    *amqp.Channel
+	amqpQueue      amqp.Queue
+	resendTicker   *time.Ticker
+	serverManager  Server.IServerManager
+	serverGroupMgr Server.IServerGroupManager
+	gameManager    Server.IGameManager
+
+	forwardedMessages map[string]QRMessage
 }
 
 func (h *ClientMessageForwarder) SetManagers(redisOptions *redis.Options, context context.Context, serverMgr Server.IServerManager, serverGroupMgr Server.IServerGroupManager, gameMgr Server.IGameManager) {
@@ -50,6 +55,7 @@ func (h *ClientMessageForwarder) SetManagers(redisOptions *redis.Options, contex
 	h.redisClient = redis.NewClient(h.redisOptions)
 	h.context = context
 	h.serverManager = serverMgr
+	h.forwardedMessages = make(map[string]QRMessage)
 }
 
 func (h *ClientMessageForwarder) HandleNewServer(serverKey string) {
@@ -151,10 +157,17 @@ func (h *ClientMessageForwarder) ForwardMessageToQR(addrPort netip.AddrPort, bas
 	qrMsg.DriverAddress = results[2]
 	qrMsg.Identifier = 111 //need to generate random value, this is the lookup key for client msg ack
 	qrMsg.Type = "client_message"
+	qrMsg.Retries = 0
 
-	jsonData, jsonErr := json.Marshal(qrMsg)
+	var qrMsgKey = h.getClientMessageUniqueKey(qrMsg)
+	h.forwardedMessages[qrMsgKey] = qrMsg
+	h.publishQRMessage(qrMsg)
+
+}
+func (h *ClientMessageForwarder) publishQRMessage(msg QRMessage) {
+	jsonData, jsonErr := json.Marshal(msg)
 	if jsonErr != nil || len(jsonErr.Error()) > 0 {
-		fmt.Fprintf(os.Stderr, "ForwardMessageToQR json marshal error: %s\n", parseError.Error())
+		fmt.Fprintf(os.Stderr, "ForwardMessageToQR json marshal error: %s\n", jsonErr.Error())
 		return
 	}
 
@@ -174,8 +187,30 @@ func (h *ClientMessageForwarder) ForwardMessageToQR(addrPort netip.AddrPort, bas
 }
 func (h *ClientMessageForwarder) OnClientMessageAck(amqpMsg amqp.Delivery) {
 	//clear retry logic
+	var qrMsg QRMessage
+	jsonErr := json.Unmarshal(amqpMsg.Body, &qrMsg)
+	if jsonErr != nil || len(jsonErr.Error()) > 0 {
+		fmt.Fprintf(os.Stderr, "OnClientMessageAck json marshal error: %s\n", jsonErr.Error())
+		return
+	}
+
+	var qrMsgKey = h.getClientMessageUniqueKey(qrMsg)
+	delete(h.forwardedMessages, qrMsgKey)
 }
 
 func (h *ClientMessageForwarder) submitResends() {
+	for msgKey, value := range h.forwardedMessages {
+		if value.Retries >= NUM_PROBE_RETRIES {
+			delete(h.forwardedMessages, msgKey)
+			continue
+		}
+		value.Retries = value.Retries + 1
+		h.forwardedMessages[msgKey] = value
+		h.publishQRMessage(value)
 
+	}
+}
+
+func (h *ClientMessageForwarder) getClientMessageUniqueKey(msg QRMessage) string {
+	return msg.Hostname + ":" + msg.DriverAddress + ":" + msg.ToAddress + ":" + strconv.Itoa(msg.InstanceKey) + ":" + strconv.Itoa(msg.Identifier)
 }

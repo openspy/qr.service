@@ -123,6 +123,7 @@ func (h *ServerProber) retryLoop() {
 			break
 		}
 	}
+	h.connection.Close()
 }
 func (h *ServerProber) doResend() {
 	for serverKey, value := range h.probes {

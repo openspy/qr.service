@@ -10,6 +10,7 @@ import (
 type IServerManager interface {
 	GetAddress(context context.Context, redisClient *redis.Client, serverKey string) *netip.AddrPort
 	GetKey(context context.Context, redisClient *redis.Client, serverKey string, keyName string) string
+	GetKeys(context context.Context, redisClient *redis.Client, serverKey string, keyNames ...string) []string
 	GetKeyInt(context context.Context, redisClient *redis.Client, serverKey string, keyName string) int
 	GetCustomKey(context context.Context, redisClient *redis.Client, serverKey string, keyName string) string
 	GetCustomKeyInt(context context.Context, redisClient *redis.Client, serverKey string, keyName string) int

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os-qr-service/Handlers"
+	"os-qr-service/Helpers"
 	"os-qr-service/Server"
 	"strings"
 
@@ -32,7 +33,7 @@ func (h *ServerEventListener) Init(ctx context.Context, connection *amqp.Connect
 	h.redisOptions = redisOpts
 
 	chListen, err := h.amqpConnection.Channel()
-	failOnError(err, "Failed to open a channel")
+	Helpers.FailOnError(err, "Failed to open a channel")
 	h.amqpChannel = chListen
 
 	q, err := h.amqpChannel.QueueDeclare(
@@ -43,7 +44,7 @@ func (h *ServerEventListener) Init(ctx context.Context, connection *amqp.Connect
 		false,        // no-wait
 		nil,          // arguments
 	)
-	failOnError(err, "Failed to declare a queue")
+	Helpers.FailOnError(err, "Failed to declare a queue")
 
 	h.amqpChannel.QueueBind(q.Name, "server.event", "openspy.master", false, nil)
 
@@ -56,16 +57,16 @@ func (h *ServerEventListener) Init(ctx context.Context, connection *amqp.Connect
 		false,  // no-wait
 		nil,    // args
 	)
-	failOnError(err, "Failed to register a consumer")
+	Helpers.FailOnError(err, "Failed to register a consumer")
 	h.amqpDelivery = msgs
 	h.serverManager = serverManager
 	h.serverGroupMgr = serverGroupMgr
 	h.gameManager = gameManager
 
-	go EventListenerFunc(h)
+	go h.EventListenerFunc()
 }
 
-func EventListenerFunc(h *ServerEventListener) {
+func (h *ServerEventListener) EventListenerFunc() {
 	for d := range h.amqpDelivery {
 		var msg = string(d.Body)
 

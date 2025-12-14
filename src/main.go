@@ -10,15 +10,12 @@ import (
 	"os/signal"
 	"strconv"
 
+	"os-qr-service/Helpers"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 )
 
-func failOnError(err error, msg string) {
-	if err != nil {
-		log.Panicf("%s: %s", msg, err)
-	}
-}
 func GetRedisOptions() *redis.Options {
 	redisOptions := &redis.Options{
 		Addr: os.Getenv("REDIS_SERVER"),
@@ -74,7 +71,7 @@ func main() {
 
 	//make listener connection, etc
 	listenConn, err := amqp.Dial(amqpAddress)
-	failOnError(err, "Failed to connect to RabbitMQ")
+	Helpers.FailOnError(err, "Failed to connect to RabbitMQ")
 	defer listenConn.Close()
 
 	var serverMgr = Server.ServerManager{}
@@ -93,6 +90,10 @@ func main() {
 	var expireHandler = &Handlers.ServerExpirationHandler{}
 	expireHandler.SetAMQPConnection(listenConn)
 	serverEventListener.RegisterHandler(expireHandler)
+
+	var clientMsgForwarder = &Handlers.ClientMessageForwarder{}
+	clientMsgForwarder.SetAMQPConnection(listenConn)
+	serverEventListener.RegisterHandler(clientMsgForwarder)
 
 	var isRunning bool = true
 	for {

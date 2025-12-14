@@ -44,6 +44,21 @@ func (m *ServerManager) GetKey(context context.Context, redisClient *redis.Clien
 	}
 	return results
 }
+func (m *ServerManager) GetKeys(context context.Context, redisClient *redis.Client, serverKey string, keyNames ...string) []string {
+	m.selectRedisDB(context, redisClient)
+	results, err := redisClient.HMGet(context, serverKey, keyNames...).Result()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "GetKeys error: %s\n", err.Error())
+		return nil
+	}
+
+	var strings []string
+	for _, str := range results {
+		var convStr = str.(string)
+		strings = append(strings, convStr)
+	}
+	return strings
+}
 func (m *ServerManager) GetKeyInt(context context.Context, redisClient *redis.Client, serverKey string, keyName string) int {
 	var key = m.GetKey(context, redisClient, serverKey, keyName)
 	intVal, err := strconv.Atoi(key)

@@ -2,7 +2,6 @@ package Handlers
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 	"net/netip"
@@ -76,7 +75,7 @@ func (h *ServerProber) getBindAddr() *net.UDPAddr {
 func (h *ServerProber) Init() {
 	ser, err := net.ListenUDP("udp4", h.getBindAddr())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ServerProber bind failed: %s\n", err.Error())
+		log.Printf("ServerProber bind failed: %s\n", err.Error())
 		return
 	}
 
@@ -99,7 +98,7 @@ func (h *ServerProber) Query(destination netip.AddrPort) {
 
 func (h *ServerProber) Query_PrequeryVerify(destination netip.AddrPort) {
 	var addr = net.UDPAddrFromAddrPort(destination)
-	log.Printf("QR2 Send query to: %s\n", addr.String())
+	log.Printf("QR2 Send prequery to: %s\n", addr.String())
 	writeBuffer := make([]byte, 7)
 	writeBuffer[0] = 0xfe
 	writeBuffer[1] = 0xfd
@@ -183,10 +182,11 @@ func (h *ServerProber) listen() {
 		var addrPort netip.AddrPort = udpAddr.AddrPort()
 		var serverKey = h.serverMgr.GetServerKeyFromAddress(h.context, h.redisServerMgrClient, addrPort)
 		if len(serverKey) == 0 {
+			log.Println("ServerProber Recvfrom server not found:", udpAddr.String())
 			continue
 		}
+		log.Println("ServerProber Recvfrom server found:", udpAddr.String())
 		delete(h.probes, serverKey)
-		log.Println("got the packet back", serverKey)
 
 		h.serverMgr.SetKeys(h.context, h.redisServerMgrClient, serverKey, []string{
 			"allow_unsolicited_udp", "1",

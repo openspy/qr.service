@@ -2,7 +2,6 @@ package Handlers
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os-qr-service/Server"
@@ -29,7 +28,7 @@ func (h *ServerExpirationHandler) getResyncInterval() time.Duration {
 	var interval_str = os.Getenv("SERVER_EXPIRE_SCAN_SECS")
 	val, err := strconv.Atoi(interval_str)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "server expire GetResyncInterval env parse error: %s\n", err.Error())
+		log.Printf("server expire GetResyncInterval env parse error: %s\n", err.Error())
 		val = 60
 	}
 	return time.Duration(val) * time.Second
@@ -38,7 +37,7 @@ func (h *ServerExpirationHandler) getMinTTL() time.Duration {
 	var interval_str = os.Getenv("SERVER_EXPIRE_MIN_TTL_SECS")
 	val, err := strconv.Atoi(interval_str)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "server expire getMinTTL env parse error: %s\n", err.Error())
+		log.Printf("server expire getMinTTL env parse error: %s\n", err.Error())
 		val = 180
 	}
 	return time.Duration(val) * time.Second
@@ -113,7 +112,7 @@ func (h *ServerExpirationHandler) doExpirationScan() {
 	for {
 		keys, nextCursor, err := h.redisClient.Scan(h.context, uint64(cursor), "*:", SERVER_EXPIRE_SCAN_BATCH_COUNT).Result()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "doExpirationScan server scan error: %s\n", err.Error())
+			log.Printf("doExpirationScan server scan error: %s\n", err.Error())
 			break
 		}
 		cursor = int(nextCursor)
@@ -128,7 +127,7 @@ func (h *ServerExpirationHandler) doExpirationScan() {
 
 		_, ttlCheckErr := ttlCheckPipeline.Exec(h.context)
 		if ttlCheckErr != nil {
-			fmt.Fprintf(os.Stderr, "doExpirationScan ttl check error: %s\n", ttlCheckErr.Error())
+			log.Printf("doExpirationScan ttl check error: %s\n", ttlCheckErr.Error())
 			break
 		}
 
@@ -148,7 +147,7 @@ func (h *ServerExpirationHandler) doExpirationScan() {
 		}
 		_, deleteErr := deletePipeline.Exec(h.context)
 		if deleteErr != nil {
-			fmt.Fprintf(os.Stderr, "doExpirationScan delete error: %s\n", deleteErr.Error())
+			log.Printf("doExpirationScan delete error: %s\n", deleteErr.Error())
 			break
 		}
 		for _, key := range deletedKeys {

@@ -2,7 +2,6 @@ package Handlers
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os-qr-service/Server"
@@ -42,7 +41,7 @@ func (h *CountryCodeAssigner) handleNewServerEvent(serverKey string) {
 		return
 	}
 	h.serverMgr.SetKey(h.context, h.redisClient, serverKey, "country", countryCode)
-	fmt.Printf("CountryCodeAssigner new server: %s - %s - %s\n",
+	log.Printf("CountryCodeAssigner new server: %s - %s - %s\n",
 		h.serverMgr.GetAddress(h.context, h.redisClient, serverKey).Addr().String(),
 		h.serverMgr.GetCustomKey(h.context, h.redisClient, serverKey, "hostname"),
 		h.serverMgr.GetKey(h.context, h.redisClient, serverKey, "challenge"))

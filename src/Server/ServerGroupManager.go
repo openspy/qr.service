@@ -2,8 +2,7 @@ package Server
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"log"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -28,7 +27,7 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 	for {
 		keys, nextCursor, err := redisGroupClient.Scan(context, uint64(cursor), "*:*", GROUP_SCAN_BATCH_COUNT).Result()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ResyncAllGroups scan error: %s\n", err.Error())
+			log.Printf("ResyncAllGroups scan error: %s\n", err.Error())
 			break
 		}
 		cursor = int(nextCursor)
@@ -43,14 +42,14 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 
 	_, err := deletePipeline.Exec(context)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ResyncAllGroups pipeline error: %s\n", err.Error())
+		log.Printf("ResyncAllGroups pipeline error: %s\n", err.Error())
 	}
 
 	//do pipelined scan of all servers
 	for {
 		keys, nextCursor, err := redisServerClient.Scan(context, uint64(cursor), "*:", GROUP_SCAN_BATCH_COUNT).Result()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ResyncAllGroups game scan error: %s\n", err.Error())
+			log.Printf("ResyncAllGroups game scan error: %s\n", err.Error())
 			break
 		}
 
@@ -65,7 +64,7 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 		}
 		_, err = gameGroupPipeline.Exec(context)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ResyncAllGroups pipeline error: %s\n", err.Error())
+			log.Printf("ResyncAllGroups pipeline error: %s\n", err.Error())
 		}
 
 		//now incr groupids for all servers which have them set
@@ -83,12 +82,12 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 		}
 		_, err = incrPipeline.Exec(context)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ResyncAllGroups INCR pipeline error: %s\n", err.Error())
+			log.Printf("ResyncAllGroups INCR pipeline error: %s\n", err.Error())
 		}
 
 		_, err = serverGroupSetPipeline.Exec(context)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ResyncAllGroups INCR server groupid error: %s\n", err.Error())
+			log.Printf("ResyncAllGroups INCR server groupid error: %s\n", err.Error())
 		}
 
 		if cursor == 0 {

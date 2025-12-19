@@ -3,11 +3,9 @@ package Handlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"math/rand/v2"
 	"net/netip"
-	"os"
 	"os-qr-service/Helpers"
 	"os-qr-service/Server"
 	"strconv"
@@ -133,7 +131,7 @@ func (h *ClientMessageForwarder) OnGotClientMessageFromServerBrowsing(amqpMsg am
 
 	addrPort, err := netip.ParseAddrPort(toIp + ":" + toPort)
 	if err != nil && len(err.Error()) > 0 {
-		fmt.Fprintf(os.Stderr, "OnGotClientMessageFromServerBrowsing ip parse error: %s\n", err.Error())
+		log.Printf("OnGotClientMessageFromServerBrowsing ip parse error: %s\n", err.Error())
 		return
 	}
 	h.ForwardMessageToQR(addrPort, message)
@@ -148,7 +146,7 @@ func (h *ClientMessageForwarder) ForwardMessageToQR(addrPort netip.AddrPort, bas
 
 	instanceKey, parseError := strconv.Atoi(results[0])
 	if parseError != nil && len(parseError.Error()) > 0 {
-		fmt.Fprintf(os.Stderr, "ForwardMessageToQR instance key parse error: %s\n", parseError.Error())
+		log.Printf("ForwardMessageToQR instance key parse error: %s\n", parseError.Error())
 		return
 	}
 
@@ -164,6 +162,8 @@ func (h *ClientMessageForwarder) ForwardMessageToQR(addrPort netip.AddrPort, bas
 	qrMsg.Retries = 0
 	qrMsg.LastResend = time.Now()
 
+	log.Printf("ForwardMessageToQR: %s - %d\n", qrMsg.ToAddress, qrMsg.InstanceKey)
+
 	var qrMsgKey = h.getClientMessageUniqueKey(qrMsg)
 	h.forwardedMessages[qrMsgKey] = qrMsg
 	h.publishQRMessage(qrMsg)
@@ -172,9 +172,11 @@ func (h *ClientMessageForwarder) ForwardMessageToQR(addrPort netip.AddrPort, bas
 func (h *ClientMessageForwarder) publishQRMessage(msg QRMessage) {
 	jsonData, jsonErr := json.Marshal(msg)
 	if jsonErr != nil && len(jsonErr.Error()) > 0 {
-		fmt.Fprintf(os.Stderr, "publishQRMessage json marshal error: %s\n", jsonErr.Error())
+		log.Printf("publishQRMessage json marshal error: %s\n", jsonErr.Error())
 		return
 	}
+
+	log.Printf("publishQRMessage: %s - %d\n", msg.ToAddress, msg.InstanceKey)
 
 	err := h.amqpChannel.PublishWithContext(h.context,
 		"openspy.master", // exchange
@@ -195,11 +197,13 @@ func (h *ClientMessageForwarder) OnClientMessageAck(amqpMsg amqp.Delivery) {
 	var qrMsg QRMessage
 	jsonErr := json.Unmarshal(amqpMsg.Body, &qrMsg)
 	if jsonErr != nil && len(jsonErr.Error()) > 0 {
-		fmt.Fprintf(os.Stderr, "OnClientMessageAck json marshal error: %s\n", jsonErr.Error())
+		log.Printf("OnClientMessageAck json marshal error: %s\n", jsonErr.Error())
 		return
 	}
 
 	qrMsg.ToAddress = qrMsg.FromAddress //handle inversion from qr server
+
+	log.Printf("OnClientMessageAck: %s - %d\n", qrMsg.ToAddress, qrMsg.InstanceKey)
 
 	var qrMsgKey = h.getClientMessageUniqueKey(qrMsg)
 	delete(h.forwardedMessages, qrMsgKey)

@@ -2,7 +2,7 @@ package Handlers
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"os"
 	"os-qr-service/Server"
 	"strconv"
@@ -39,7 +39,7 @@ func (h *ServerGroupUpdater) getResyncInterval() time.Duration {
 	var interval_str = os.Getenv("GROUP_UPDATE_RESYNC_SECS")
 	val, err := strconv.Atoi(interval_str)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "server group GetResyncInterval env parse error: %s\n", err.Error())
+		log.Printf("server group GetResyncInterval env parse error: %s\n", err.Error())
 		val = 300
 	}
 	return time.Duration(val) * time.Second

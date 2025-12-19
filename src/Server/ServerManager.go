@@ -2,9 +2,8 @@ package Server
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"net/netip"
-	"os"
 	"strconv"
 
 	"github.com/redis/go-redis/v9"
@@ -19,7 +18,7 @@ func (m *ServerManager) GetGroupKey(context context.Context, redisClient *redis.
 	groupidCmd := pipeline.HGet(context, serverKey+"custkeys", "groupid")
 	_, err := pipeline.Exec(context)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "IncrNumServers pipeline error: %s\n", err.Error())
+		log.Printf("IncrNumServers pipeline error: %s\n", err.Error())
 	}
 	gamename, _ := gamenameCmd.Result()
 	groupid, _ := groupidCmd.Result()
@@ -29,7 +28,7 @@ func (m *ServerManager) GetGroupKey(context context.Context, redisClient *redis.
 func (m *ServerManager) GetAddress(context context.Context, redisClient *redis.Client, serverKey string) *netip.AddrPort {
 	results, err := redisClient.HMGet(context, serverKey, "wan_ip", "wan_port").Result()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "GetAddress error: %s\n", err.Error())
+		log.Printf("GetAddress error: %s\n", err.Error())
 		return nil
 	}
 	if results[0] == nil || results[1] == nil {
@@ -41,7 +40,7 @@ func (m *ServerManager) GetAddress(context context.Context, redisClient *redis.C
 	var addrPort netip.AddrPort
 	addrPort, addrErr := netip.ParseAddrPort(wanip + ":" + wanport_str)
 	if addrErr != nil {
-		fmt.Fprintf(os.Stderr, "GetAddress parse error: %s\n", addrErr.Error())
+		log.Printf("GetAddress parse error: %s\n", addrErr.Error())
 		return nil
 	}
 	return &addrPort
@@ -49,7 +48,7 @@ func (m *ServerManager) GetAddress(context context.Context, redisClient *redis.C
 func (m *ServerManager) GetKey(context context.Context, redisClient *redis.Client, serverKey string, keyName string) string {
 	results, err := redisClient.HGet(context, serverKey, keyName).Result()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "GetKey error: %s\n", err.Error())
+		log.Printf("GetKey error: %s\n", err.Error())
 		return ""
 	}
 	return results
@@ -57,7 +56,7 @@ func (m *ServerManager) GetKey(context context.Context, redisClient *redis.Clien
 func (m *ServerManager) GetKeys(context context.Context, redisClient *redis.Client, serverKey string, keyNames ...string) []string {
 	results, err := redisClient.HMGet(context, serverKey, keyNames...).Result()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "GetKeys error: %s\n", err.Error())
+		log.Printf("GetKeys error: %s\n", err.Error())
 		return nil
 	}
 
@@ -72,7 +71,7 @@ func (m *ServerManager) GetKeyInt(context context.Context, redisClient *redis.Cl
 	var key = m.GetKey(context, redisClient, serverKey, keyName)
 	intVal, err := strconv.Atoi(key)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "GetKeyInt parse error: %s\n", err.Error())
+		log.Printf("GetKeyInt parse error: %s\n", err.Error())
 		return 0
 	}
 	return intVal
@@ -81,7 +80,7 @@ func (m *ServerManager) GetCustomKey(context context.Context, redisClient *redis
 	var custkey = serverKey + "custkeys"
 	results, err := redisClient.HGet(context, custkey, keyName).Result()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "GetCustomKey error: %s\n", err.Error())
+		log.Printf("GetCustomKey error: %s\n", err.Error())
 		return ""
 	}
 	return results
@@ -99,14 +98,14 @@ func (m *ServerManager) GetCustomKeyInt(context context.Context, redisClient *re
 func (m *ServerManager) SetKey(context context.Context, redisClient *redis.Client, serverKey string, keyName string, keyValue string) {
 	_, err := redisClient.HSet(context, serverKey, keyName, keyValue).Result()
 	if err != nil && len(err.Error()) > 0 {
-		fmt.Fprintf(os.Stderr, "SetKey error: %s\n", err.Error())
+		log.Printf("SetKey error: %s\n", err.Error())
 	}
 }
 
 func (m *ServerManager) SetKeys(context context.Context, redisClient *redis.Client, serverKey string, keys []string) {
 	_, err := redisClient.HSet(context, serverKey, keys).Result()
 	if err != nil && len(err.Error()) > 0 {
-		fmt.Fprintf(os.Stderr, "SetKeys error: %s\n", err.Error())
+		log.Printf("SetKeys error: %s\n", err.Error())
 	}
 }
 
@@ -116,7 +115,7 @@ func (m *ServerManager) GetServerKeyFromAddress(context context.Context, redisCl
 	var key = "IPMAP_" + addrPort.Addr().String() + "-" + portStr
 	result, err := redisClient.Get(context, key).Result()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "GetServerKeyFromAddress error: %s\n", err.Error())
+		log.Printf("GetServerKeyFromAddress error: %s\n", err.Error())
 		return ""
 	}
 	return result

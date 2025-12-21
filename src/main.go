@@ -81,7 +81,7 @@ func main() {
 	var gameMgr = Server.GameManager{}
 
 	var serverEventListener *ServerEventListener = &ServerEventListener{}
-	serverEventListener.Init(ctx, listenConn, &serverMgr, &serverGroupMgr, &gameMgr, GetRedisOptions())
+	serverEventListener.Init(ctx, cancel, listenConn, &serverMgr, &serverGroupMgr, &gameMgr, GetRedisOptions())
 
 	serverEventListener.RegisterHandler(&Handlers.ServerProber{})
 	serverEventListener.RegisterHandler(&Handlers.CountryCodeAssigner{})

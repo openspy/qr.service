@@ -61,6 +61,7 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 		for _, key := range keys {
 			groupPipelineCmds = append(groupPipelineCmds, gameGroupPipeline.HGet(context, key+"custkeys", "gamename")) //XXX: remove cust keys later (it can be incorrect via custkeys as some games modify it)
 			groupPipelineCmds = append(groupPipelineCmds, gameGroupPipeline.HGet(context, key+"custkeys", "groupid"))
+			groupPipelineCmds = append(groupPipelineCmds, gameGroupPipeline.HGet(context, key, "deleted"))
 			serverKeys = append(serverKeys, key)
 		}
 		_, err = gameGroupPipeline.Exec(context)
@@ -71,21 +72,27 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 		//now incr groupids for all servers which have them set
 		incrPipeline := redisGroupClient.Pipeline()
 		serverGroupSetPipeline := redisServerClient.Pipeline()
-		for idx := 0; idx < len(groupPipelineCmds); idx += 2 {
+		var idx int = 0
+		for _, serverKey := range serverKeys {
 			gamename, err := groupPipelineCmds[idx].Result()
-			if err != nil {
+			if err != nil && len(err.Error()) > 0 {
 				log.Printf("ResyncAllGroups pipeline error: %s\n", err.Error())
 			}
 			groupidStr, err := groupPipelineCmds[idx+1].Result()
-			if err != nil {
+			if err != nil && len(err.Error()) > 0 {
 				log.Printf("ResyncAllGroups pipeline error: %s\n", err.Error())
 			}
-			if len(groupidStr) == 0 || len(gamename) == 0 {
+			deletedStr, err := groupPipelineCmds[idx+2].Result()
+			if err != nil && len(err.Error()) > 0 {
+				log.Printf("ResyncAllGroups pipeline error: %s\n", err.Error())
+			}
+			idx = idx + 3
+			if len(groupidStr) == 0 || len(gamename) == 0 || deletedStr != "0" {
 				continue
 			}
 			var groupKey = gamename + ":" + groupidStr + ":custkeys"
 			incrPipeline.HIncrBy(context, groupKey, "numservers", 1)
-			serverGroupSetPipeline.HSet(context, serverKeys[idx/2], "groupid_set", groupidStr)
+			serverGroupSetPipeline.HSet(context, serverKey, "groupid_set", groupidStr)
 		}
 		_, err = incrPipeline.Exec(context)
 		if err != nil {

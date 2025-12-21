@@ -7,7 +7,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const GROUP_SCAN_BATCH_COUNT int64 = 500
+const GROUP_SCAN_BATCH_COUNT int64 = 250
 
 type ServerGroupManager struct {
 }
@@ -22,9 +22,9 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 
 	var cursor int = 0
 
-	deletePipeline := redisGroupClient.Pipeline()
 	//do pipelined scan and clear
 	for {
+		deletePipeline := redisGroupClient.Pipeline()
 		keys, nextCursor, err := redisGroupClient.Scan(context, uint64(cursor), "*:*", GROUP_SCAN_BATCH_COUNT).Result()
 		if err != nil {
 			log.Printf("ResyncAllGroups scan error: %s\n", err.Error())
@@ -36,14 +36,14 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 			var custkey = key + "custkeys"
 			deletePipeline.HSet(context, custkey, "numservers", "0")
 		}
+		_, err = deletePipeline.Exec(context)
+		if err != nil {
+			log.Printf("ResyncAllGroups pipeline error: %s\n", err.Error())
+		}
+
 		if cursor == 0 {
 			break
 		}
-	}
-
-	_, err := deletePipeline.Exec(context)
-	if err != nil {
-		log.Printf("ResyncAllGroups pipeline error: %s\n", err.Error())
 	}
 
 	//do pipelined scan of all servers

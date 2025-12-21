@@ -33,7 +33,8 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 		cursor = int(nextCursor)
 
 		for _, key := range keys {
-			deletePipeline.HSet(context, key, "numservers", "0")
+			var custkey = key + "custkeys"
+			deletePipeline.HSet(context, custkey, "numservers", "0")
 		}
 		if cursor == 0 {
 			break
@@ -58,7 +59,7 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 		var serverKeys []string
 		gameGroupPipeline := redisServerClient.Pipeline()
 		for _, key := range keys {
-			groupPipelineCmds = append(groupPipelineCmds, gameGroupPipeline.HGet(context, key, "gamename"))
+			groupPipelineCmds = append(groupPipelineCmds, gameGroupPipeline.HGet(context, key+"custkeys", "gamename")) //XXX: remove cust keys later (it can be incorrect via custkeys as some games modify it)
 			groupPipelineCmds = append(groupPipelineCmds, gameGroupPipeline.HGet(context, key+"custkeys", "groupid"))
 			serverKeys = append(serverKeys, key)
 		}
@@ -71,12 +72,18 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 		incrPipeline := redisGroupClient.Pipeline()
 		serverGroupSetPipeline := redisServerClient.Pipeline()
 		for idx := 0; idx < len(groupPipelineCmds); idx += 2 {
-			gamename, _ := groupPipelineCmds[idx].Result()
-			groupidStr, _ := groupPipelineCmds[idx+1].Result()
+			gamename, err := groupPipelineCmds[idx].Result()
+			if err != nil {
+				log.Printf("ResyncAllGroups pipeline error: %s\n", err.Error())
+			}
+			groupidStr, err := groupPipelineCmds[idx+1].Result()
+			if err != nil {
+				log.Printf("ResyncAllGroups pipeline error: %s\n", err.Error())
+			}
 			if len(groupidStr) == 0 || len(gamename) == 0 {
 				continue
 			}
-			var groupKey = gamename + ":" + groupidStr
+			var groupKey = gamename + ":" + groupidStr + ":custkeys"
 			incrPipeline.HIncrBy(context, groupKey, "numservers", 1)
 			serverGroupSetPipeline.HSet(context, serverKeys[idx/2], "groupid_set", groupidStr)
 		}

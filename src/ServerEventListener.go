@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"os-qr-service/Handlers"
 	"os-qr-service/Helpers"
 	"os-qr-service/Server"
@@ -73,7 +72,7 @@ func (h *ServerEventListener) EventListenerFunc() {
 		var msg = string(d.Body)
 
 		var splitMsg = strings.Split(msg, "\\")
-		log.Println(splitMsg)
+		//log.Println(splitMsg)
 
 		for _, handler := range h.handlers {
 			switch splitMsg[1] {

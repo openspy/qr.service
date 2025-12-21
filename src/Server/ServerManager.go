@@ -48,7 +48,7 @@ func (m *ServerManager) GetAddress(context context.Context, redisClient *redis.C
 func (m *ServerManager) GetKey(context context.Context, redisClient *redis.Client, serverKey string, keyName string) string {
 	results, err := redisClient.HGet(context, serverKey, keyName).Result()
 	if err != nil {
-		log.Printf("GetKey error: %s\n", err.Error())
+		//log.Printf("GetKey error: %s\n", err.Error())
 		return ""
 	}
 	return results
@@ -56,7 +56,7 @@ func (m *ServerManager) GetKey(context context.Context, redisClient *redis.Clien
 func (m *ServerManager) GetKeys(context context.Context, redisClient *redis.Client, serverKey string, keyNames ...string) []string {
 	results, err := redisClient.HMGet(context, serverKey, keyNames...).Result()
 	if err != nil {
-		log.Printf("GetKeys error: %s\n", err.Error())
+		//log.Printf("GetKeys error: %s\n", err.Error())
 		return nil
 	}
 
@@ -71,7 +71,7 @@ func (m *ServerManager) GetKeyInt(context context.Context, redisClient *redis.Cl
 	var key = m.GetKey(context, redisClient, serverKey, keyName)
 	intVal, err := strconv.Atoi(key)
 	if err != nil {
-		log.Printf("GetKeyInt parse error: %s\n", err.Error())
+		//log.Printf("GetKeyInt parse error: %s\n", err.Error())
 		return 0
 	}
 	return intVal
@@ -80,7 +80,7 @@ func (m *ServerManager) GetCustomKey(context context.Context, redisClient *redis
 	var custkey = serverKey + "custkeys"
 	results, err := redisClient.HGet(context, custkey, keyName).Result()
 	if err != nil {
-		log.Printf("GetCustomKey error: %s\n", err.Error())
+		//log.Printf("GetCustomKey error: %s\n", err.Error())
 		return ""
 	}
 	return results

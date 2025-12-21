@@ -102,16 +102,21 @@ func (h *ServerGroupUpdater) incrServerGroupid(serverKey string) {
 
 	h.serverMgr.SetKey(h.context, h.redisServerMgrClient, serverKey, "groupid_set", strconv.Itoa(groupid))
 
-	var groupkey = h.serverMgr.GetGroupKey(h.context, h.redisGroupMgrClient, serverKey)
+	var groupkey = h.serverMgr.GetGroupKey(h.context, h.redisServerMgrClient, serverKey)
 	h.groupMgr.IncrNumServers(h.context, h.redisGroupMgrClient, groupkey)
 }
 
 func (h *ServerGroupUpdater) decrServerGroupid(serverKey string) {
-	if h.serverMgr.GetKeyInt(h.context, h.redisServerMgrClient, serverKey, "groupid_set") == 0 {
+	var groupid = h.serverMgr.GetKeyInt(h.context, h.redisServerMgrClient, serverKey, "groupid_set")
+	if groupid == 0 {
 		return
 	}
 	h.serverMgr.DeleteKey(h.context, h.redisServerMgrClient, serverKey, "groupid_set")
 
-	var groupkey = h.serverMgr.GetGroupKey(h.context, h.redisGroupMgrClient, serverKey)
+	//var groupkey = h.serverMgr.GetGroupKey(h.context, h.redisServerMgrClient, serverKey)
+
+	//we generate the groupkey based off groupid_set incase of the edge case where they may update the groupid later, resulting in mismatch... this situation is not known to occur, so for now we just leave the original value
+	gamename, _ := h.redisServerMgrClient.HGet(h.context, serverKey+"custkeys", "gamename").Result() //XXX: remove cust keys later (it can be incorrect via custkeys as some games modify it)
+	var groupkey = gamename + ":" + strconv.Itoa(groupid)
 	h.groupMgr.DecrNumServers(h.context, h.redisGroupMgrClient, groupkey)
 }

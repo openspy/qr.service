@@ -13,6 +13,7 @@ import (
 )
 
 type ServerEventListener struct {
+	cancelFunc     context.CancelFunc
 	amqpCtx        context.Context
 	amqpConnection *amqp.Connection
 	amqpChannel    *amqp.Channel
@@ -25,7 +26,8 @@ type ServerEventListener struct {
 	gameManager    Server.IGameManager
 }
 
-func (h *ServerEventListener) Init(ctx context.Context, connection *amqp.Connection, serverManager Server.IServerManager, serverGroupMgr Server.IServerGroupManager, gameManager Server.IGameManager, redisOpts *redis.Options) {
+func (h *ServerEventListener) Init(ctx context.Context, cancelFunc context.CancelFunc, connection *amqp.Connection, serverManager Server.IServerManager, serverGroupMgr Server.IServerGroupManager, gameManager Server.IGameManager, redisOpts *redis.Options) {
+	h.cancelFunc = cancelFunc
 	h.amqpCtx = ctx
 	h.amqpConnection = connection
 	h.isRunning = true
@@ -83,8 +85,8 @@ func (h *ServerEventListener) EventListenerFunc() {
 				handler.HandleUpdateServer(splitMsg[2])
 			}
 		}
-
 	}
+	h.cancelFunc()
 }
 
 func (h *ServerEventListener) RegisterHandler(handler Handlers.IServerEventHandler) {

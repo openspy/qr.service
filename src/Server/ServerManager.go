@@ -14,7 +14,7 @@ type ServerManager struct {
 
 func (m *ServerManager) GetGroupKey(context context.Context, redisClient *redis.Client, serverKey string) string {
 	pipeline := redisClient.Pipeline()
-	gamenameCmd := pipeline.HGet(context, serverKey, "gamename")
+	gamenameCmd := pipeline.HGet(context, serverKey+"custkeys", "gamename") //XXX: remove cust keys later (it can be incorrect via custkeys as some games modify it)
 	groupidCmd := pipeline.HGet(context, serverKey+"custkeys", "groupid")
 	_, err := pipeline.Exec(context)
 	if err != nil {

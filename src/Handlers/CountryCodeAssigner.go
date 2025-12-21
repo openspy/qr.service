@@ -41,10 +41,9 @@ func (h *CountryCodeAssigner) handleNewServerEvent(serverKey string) {
 		return
 	}
 	h.serverMgr.SetKey(h.context, h.redisClient, serverKey, "country", countryCode)
-	log.Printf("CountryCodeAssigner new server: %s - %s - %s\n",
+	log.Printf("CountryCodeAssigner new server: %s - %s\n",
 		h.serverMgr.GetAddress(h.context, h.redisClient, serverKey).Addr().String(),
-		h.serverMgr.GetCustomKey(h.context, h.redisClient, serverKey, "hostname"),
-		h.serverMgr.GetKey(h.context, h.redisClient, serverKey, "challenge"))
+		serverKey)
 }
 func (h *CountryCodeAssigner) HandleNewServer(serverKey string) {
 	h.newServerNotifyChan <- serverKey

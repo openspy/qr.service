@@ -14,6 +14,7 @@ import (
 type ServerGroupUpdater struct {
 	serverMgr Server.IServerManager
 	groupMgr  Server.IServerGroupManager
+	gameMgr   Server.IGameManager
 
 	context context.Context
 
@@ -24,6 +25,7 @@ type ServerGroupUpdater struct {
 	redisOptions         *redis.Options
 	redisServerMgrClient *redis.Client
 	redisGroupMgrClient  *redis.Client
+	redisGameMgrClient   *redis.Client
 }
 
 func (h *ServerGroupUpdater) HandleNewServer(serverKey string) {
@@ -48,6 +50,7 @@ func (h *ServerGroupUpdater) SetManagers(redisOptions *redis.Options, context co
 	h.context = context
 	h.serverMgr = serverMgr
 	h.groupMgr = serverGroupMgr
+	h.gameMgr = gameMgr
 
 	h.newServerNotifyChan = make(chan string, DEFAULT_CHANNEL_BUFFER_SIZE)
 	h.delServerNotifyChan = make(chan string, DEFAULT_CHANNEL_BUFFER_SIZE)
@@ -60,6 +63,9 @@ func (h *ServerGroupUpdater) SetManagers(redisOptions *redis.Options, context co
 
 	h.redisOptions.DB = 1
 	h.redisGroupMgrClient = redis.NewClient(h.redisOptions)
+
+	h.redisOptions.DB = 2
+	h.redisGameMgrClient = redis.NewClient(h.redisOptions)
 
 	h.groupMgr.ResyncAllGroups(h.context, h.redisServerMgrClient, h.redisGroupMgrClient)
 
@@ -102,7 +108,10 @@ func (h *ServerGroupUpdater) incrServerGroupid(serverKey string) {
 
 	h.serverMgr.SetKey(h.context, h.redisServerMgrClient, serverKey, "groupid_set", strconv.Itoa(groupid))
 
-	var groupkey = h.serverMgr.GetGroupKey(h.context, h.redisServerMgrClient, serverKey)
+	var gameid = h.serverMgr.GetKeyInt(h.context, h.redisServerMgrClient, serverKey, "gameid")
+	var gamename = h.gameMgr.GetGamename(h.context, h.redisGameMgrClient, gameid)
+	var groupkey = gamename + ":" + strconv.Itoa(groupid)
+
 	h.groupMgr.IncrNumServers(h.context, h.redisGroupMgrClient, groupkey)
 }
 
@@ -113,10 +122,8 @@ func (h *ServerGroupUpdater) decrServerGroupid(serverKey string) {
 	}
 	h.serverMgr.DeleteKey(h.context, h.redisServerMgrClient, serverKey, "groupid_set")
 
-	//var groupkey = h.serverMgr.GetGroupKey(h.context, h.redisServerMgrClient, serverKey)
-
-	//we generate the groupkey based off groupid_set incase of the edge case where they may update the groupid later, resulting in mismatch... this situation is not known to occur, so for now we just leave the original value
-	gamename, _ := h.redisServerMgrClient.HGet(h.context, serverKey+"custkeys", "gamename").Result() //XXX: remove cust keys later (it can be incorrect via custkeys as some games modify it)
+	var gameid = h.serverMgr.GetKeyInt(h.context, h.redisServerMgrClient, serverKey, "gameid")
+	var gamename = h.gameMgr.GetGamename(h.context, h.redisGameMgrClient, gameid)
 	var groupkey = gamename + ":" + strconv.Itoa(groupid)
 	h.groupMgr.DecrNumServers(h.context, h.redisGroupMgrClient, groupkey)
 }

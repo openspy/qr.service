@@ -20,6 +20,15 @@ func (m *GameManager) GetGameKey(context context.Context, redisClient *redis.Cli
 	}
 	return result
 }
+func (m *GameManager) GetGamename(context context.Context, redisClient *redis.Client, gameid int) string {
+	var gamekey = m.GetGameKey(context, redisClient, gameid)
+	result, err := redisClient.HGet(context, gamekey, "gamename").Result()
+	if err != nil && len(err.Error()) > 0 {
+		log.Printf("GetGamename error: %s\n", err.Error())
+		return ""
+	}
+	return result
+}
 func (m *GameManager) GetBackendFlags(context context.Context, redisClient *redis.Client, gameKey string) int {
 	result, err := redisClient.HGet(context, gameKey, "backendflags").Result()
 	if err != nil && len(err.Error()) > 0 {

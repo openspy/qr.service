@@ -25,7 +25,7 @@ func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServe
 	//do pipelined scan and clear
 	for {
 		deletePipeline := redisGroupClient.Pipeline()
-		keys, nextCursor, err := redisGroupClient.Scan(context, uint64(cursor), "*:*", GROUP_SCAN_BATCH_COUNT).Result()
+		keys, nextCursor, err := redisGroupClient.Scan(context, uint64(cursor), "*:", GROUP_SCAN_BATCH_COUNT).Result()
 		if err != nil {
 			log.Printf("ResyncAllGroups scan error: %s\n", err.Error())
 			break

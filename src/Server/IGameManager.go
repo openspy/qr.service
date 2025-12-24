@@ -8,5 +8,6 @@ import (
 
 type IGameManager interface {
 	GetGameKey(context context.Context, redisClient *redis.Client, gameid int) string
+	GetGamename(context context.Context, redisClient *redis.Client, gameid int) string
 	GetBackendFlags(context context.Context, redisClient *redis.Client, gameKey string) int
 }

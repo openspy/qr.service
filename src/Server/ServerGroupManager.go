@@ -13,10 +13,10 @@ type ServerGroupManager struct {
 }
 
 func (m *ServerGroupManager) IncrNumServers(context context.Context, redisClient *redis.Client, groupKey string) {
-	redisClient.HIncrBy(context, groupKey, "numservers", 1)
+	redisClient.HIncrBy(context, groupKey+"custkeys", "numservers", 1)
 }
 func (m *ServerGroupManager) DecrNumServers(context context.Context, redisClient *redis.Client, groupKey string) {
-	redisClient.HIncrBy(context, groupKey, "numservers", -1)
+	redisClient.HIncrBy(context, groupKey+"custkeys", "numservers", -1)
 }
 func (m *ServerGroupManager) ResyncAllGroups(context context.Context, redisServerClient *redis.Client, redisGroupClient *redis.Client) {
 

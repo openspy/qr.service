@@ -1,5 +1,9 @@
 package Handlers
 
+/*
+	Note: currently this only probes new servers, so its possible a server will be added while this service is offline and not get probed / mess up dedicated server based games
+	we should add a startup check that probes all servers without allow_unsolicited_udp
+*/
 import (
 	"context"
 	"log"

@@ -8,5 +8,4 @@ RUN go build -o ../qr-service
 FROM golang:latest
 WORKDIR /app
 COPY --from=build /app/qr-service qr-service
-COPY run.sh .
 ENTRYPOINT ["/app/qr-service"]
